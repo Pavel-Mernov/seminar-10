@@ -152,56 +152,67 @@
     *Результаты тестов:*
     ![image](https://github.com/user-attachments/assets/1cd34f4a-57c5-4de1-86cf-375176d4d042)
     ![image](https://github.com/user-attachments/assets/b579d814-1440-4d0b-98f0-345355d03819)
-    
+    ![image](https://github.com/user-attachments/assets/3acbef6e-53f9-44f5-aa63-e39cb4bb45f6)
+    ![image](https://github.com/user-attachments/assets/7c5de449-af6b-412e-9274-98fd8827d25f)
+
     
     *Объясните результаты:*
-    [Ваше объяснение]
+    На все запросы, кроме `WHERE category = $1 AND author = $2`, СУБД отвечала быстро (меньше 1 мсек) - так и предполагалось.
 
-15. Выполните регистронезависимый поиск по началу названия:
+    На запрос `WHERE category = $1 AND author = $2` был довольно долгий ответ ($1.6$ мсек), ввиду конфликта индексов на тип **varchar**.
+
+16. Выполните регистронезависимый поиск по началу названия:
     ```sql
     EXPLAIN ANALYZE
     SELECT * FROM t_books WHERE title ILIKE 'Relational%';
     ```
     
     *План выполнения:*
-    [Вставьте план выполнения]
+    ![image](https://github.com/user-attachments/assets/1d2e1c20-b0f7-41dd-9fa1-55b381b299b3)
+
     
     *Объясните результат:*
-    [Ваше объяснение]
+    Поиск выполняется **очень долго** - $255$ миллисекунд.
 
-16. Создайте функциональный индекс:
+    **Вывод**
+
+    Стандартный индекс на тип **Varchar** плохо оптимизирует запросы на регистронезависимый поиск с оператором $ILIKE$.
+
+18. Создайте функциональный индекс:
     ```sql
     CREATE INDEX t_books_up_title_idx ON t_books(UPPER(title));
     ```
     
     *Результат:*
-    [Вставьте результат выполнения]
+    ![image](https://github.com/user-attachments/assets/d81e07a2-c814-427d-a43e-08192033213e)
 
-17. Выполните запрос из шага 13 с использованием UPPER:
+19. Выполните запрос из шага 13 с использованием UPPER:
     ```sql
     EXPLAIN ANALYZE
     SELECT * FROM t_books WHERE UPPER(title) LIKE 'RELATIONAL%';
     ```
     
     *План выполнения:*
-    [Вставьте план выполнения]
+    ![image](https://github.com/user-attachments/assets/d2ef288b-42c0-4851-92d5-dd8eac1fb975)
+
     
     *Объясните результат:*
-    [Ваше объяснение]
+    Слишком долгий фактический поиск ($99$ мс), по сравнению с ожидаемым ($< 1$ мс). Возможно это связано с тем, что индекс создавался для функции $UPPER$, а при поиске используется более сложный алгоритм сравнения.
 
-18. Выполните поиск подстроки:
+20. Выполните поиск подстроки:
     ```sql
     EXPLAIN ANALYZE
     SELECT * FROM t_books WHERE title ILIKE '%Core%';
     ```
     
     *План выполнения:*
-    [Вставьте план выполнения]
+    ![image](https://github.com/user-attachments/assets/fe46bdda-106f-499c-a882-58485824f900)
     
     *Объясните результат:*
-    [Ваше объяснение]
 
-19. Попробуйте удалить все индексы:
+    Опять же, значительно более долгий фактический поиск, по сравнению с ожидаемым, возможно, связан с тем, что индекс создавался для функции $UPPER$, а при поиске используется более сложный алгоритм сравнения.
+
+21. Попробуйте удалить все индексы:
     ```sql
     DO $$ 
     DECLARE
@@ -209,7 +220,7 @@
     BEGIN
         FOR r IN (SELECT indexname FROM pg_indexes 
                   WHERE tablename = 't_books' 
-                  AND indexname != 'books_pkey')
+                  AND indexname != 't_books_id_pk')
         LOOP
             EXECUTE 'DROP INDEX ' || r.indexname;
         END LOOP;
@@ -217,12 +228,13 @@
     ```
     
     *Результат:*
-    [Вставьте результат выполнения]
+    ![image](https://github.com/user-attachments/assets/ee5d54f3-07b7-4e6d-b726-41b76f9f2b32)
+
     
     *Объясните результат:*
-    [Ваше объяснение]
+    Пришлось изменить запрос (имя индекса для $PRIMARY KEY$), т.к. попытка удаления индекса первичного ключа приводит к ошибке.
 
-20. Создайте индекс для оптимизации суффиксного поиска:
+22. Создайте индекс для оптимизации суффиксного поиска:
     ```sql
     -- Вариант 1: с reverse()
     CREATE INDEX t_books_rev_title_idx ON t_books(reverse(title));
@@ -233,36 +245,42 @@
     ```
     
     *Результаты тестов:*
-    [Вставьте планы выполнения для обоих вариантов]
+    ![image](https://github.com/user-attachments/assets/ba064928-8aba-40ae-9728-82ca87b9ad6d)
+
+    ![image](https://github.com/user-attachments/assets/a9349b91-c8bd-42a7-bef6-143fcab0aa7a)
+
     
     *Объясните результаты:*
-    [Ваше объяснение]
+    Индексы на суффиксный поиск созданы успешно.
 
-21. Выполните поиск по точному совпадению:
+23. Выполните поиск по точному совпадению:
     ```sql
     EXPLAIN ANALYZE
     SELECT * FROM t_books WHERE title = 'Oracle Core';
     ```
     
     *План выполнения:*
-    [Вставьте план выполнения]
+    ![image](https://github.com/user-attachments/assets/abb10729-3e3b-4374-a044-32a118776795)
+
     
     *Объясните результат:*
-    [Ваше объяснение]
 
-22. Выполните поиск по началу названия:
+    Фактическое время выполнения - $< 1$ мсек. (гораздо меньше, чем ожидаемое $> 2$ мсек). Проверка на равенство строк зарекомендовала себя как эффективный инструмент (в сочетании с индексом).
+
+24. Выполните поиск по началу названия:
     ```sql
     EXPLAIN ANALYZE
     SELECT * FROM t_books WHERE title ILIKE 'Relational%';
     ```
     
     *План выполнения:*
-    [Вставьте план выполнения]
+    ![image](https://github.com/user-attachments/assets/9c856500-b967-482a-a58b-01cce1020a0c)
+
     
     *Объясните результат:*
     [Ваше объяснение]
 
-23. Создайте свой пример индекса с обратной сортировкой:
+25. Создайте свой пример индекса с обратной сортировкой:
     ```sql
     CREATE INDEX t_books_desc_idx ON t_books(title DESC);
     ```
